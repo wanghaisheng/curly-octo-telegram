@@ -1,6 +1,7 @@
 这是为您深度整合、针对 **Lovable/Vite 环境**优化后的最终定稿规范。
 
 在 Lovable 平台约束下（必须保留 `src/` 根目录以维持 Supabase 类型生成和 Vite 工具链），我们采用 **“内生式模块化单体 (Modular Monolith inside src/)”** 架构，逻辑上模拟 Monorepo，物理上保持单体兼容。
+在这种架构下，Web、PWA、React Native 以及 Edge Worker 共享同一个“大脑” (Action Layer)，改变的仅仅是“神经传导方式”（tRPC、HTTP 或直接本地调用）和“记忆介质”（D1、Supabase 或 SQLite）。
 
 ---
 
