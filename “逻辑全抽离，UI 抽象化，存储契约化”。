@@ -1,0 +1,503 @@
+# 类型安全最佳实践 (Type Safety Guidelines)
+
+## 1. 契约优先：tRPC & Zod 集成
+
+系统架构的核心是 **“类型即契约”**。
+
+*   **定义端**: 使用 Zod 定义输入输出的 Schema。
+
+*   **消费端**: 通过 tRPC 自动推导客户端 API 的入参和出参类型，实现 0 API 文档化开发。
+
+*   **跨平台**: 同一套 Zod Schema 必须同时用于 Web 端的 tRPC 和 RN 端的本地逻辑校验。
+
+## 2. 结果对象模式 (Result Pattern)
+
+为了统一处理本地错误、网络错误和业务错误，API 层必须返回：
+
+```typescript
+
+type Result<T, E = AppError> = 
+
+  | { ok: true; data: T; source: 'server' | 'cache' | 'local' } 
+
+  | { ok: false; error: E };
+
+```
+
+**UI 强制处理**: 表现层通过判断 ok 状态进行渲染，杜绝未捕获异常。
+
+## 3. 零 any 原则与类型守卫
+
+*   **禁止 any**: 外部输入（如 URL 参数、存储读取）默认为 unknown。
+
+*   **运行时检查**: 必须通过类型谓词 (Type Predicates) 或 Zod 解析后才能进入业务逻辑。
+
+## 4. 存储层类型契约
+
+```typescript
+
+interface IStorageAdapter {
+
+  // 使用泛型 T 确保从存储获取的对象符合领域模型定义
+
+  query<T>(collection: string, params: QueryParams): Promise<Result<T[]>>;
+
+  
+
+  auth: {
+
+    getSession(): Promise<Result<Session | null>>;
+
+  };
+
+}
+
+```
+
+## 5. 样式与 Token 类型化
+
+```typescript
+
+// 定义全局统一的设计 Token 类型
+
+type ColorToken = keyof typeof DesignSystem.colors;
+
+type SpacingToken = keyof typeof DesignSystem.spacing;
+
+// UI 组件 Props 必须引用这些 Token 类型，而非 string
+
+```
+
+## 6. 类型安全检查清单
+
+*   所有的 API 动作是否都有对应的 Zod 校验？
+
+*   结果对象是否包含了 source 字段以支持移动端离线感知？
+
+*   是否在 API 层之外的地方引用了数据库厂商的类型？（应使用自定义的 Entity 类型）
+
+*   所有的枚举值是否都使用了 as const 或 enum 进行类型化？“逻辑全抽离，UI 抽象化，存储契约化”。
+
+在这种架构下，**Web、PWA、React Native 以及 Edge Worker 共享同一个“大脑” (Action Layer)**，改变的仅仅是“神经传导方式”（tRPC、HTTP 或直接本地调用）和“记忆介质”（D1、Supabase 或 SQLite）。
+
+以下是为你最终定稿的 2 份技术架构规范文档：
+
+---
+
+### 文档 1：技术架构与多端解耦规范 (ARCH_STANDARDS.md)
+
+```markdown
+# 技术架构与多端解耦规范 (Unified Core Architecture Standards)
+
+## 1. 核心哲学：一套逻辑，多端注入
+架构的核心在于将业务逻辑抽象为 **"Procedures (动作过程)"**，通过不同的传输层和存储适配器实现跨平台运行。
+
+### 1.1 三位一体架构层
+1.  **表现层 (UI Layer)**:
+    *   **Web**: Astro + React (HTML/Tailwind)。
+    *   **Mobile**: React Native (Native Components/StyleSheet)。
+    *   **要求**: 仅作为“状态机”展示数据，通过统一的客户端代理发起请求。
+2.  **动作层 (Action Layer / Unified API)**:
+    *   **职责**: 核心业务逻辑、校验、计算。
+    *   **传输策略**: 
+        *   **tRPC 模式**: Web 端通过 HTTP 远程调用 Server 端的逻辑。
+        *   **Local 模式**: RN 端或离线 PWA 直接在本地注入并执行相同的逻辑。
+3.  **持久层 (Storage Adapters)**:
+    *   **职责**: 契约化存储。所有持久化操作必须通过 `IStorageAdapter` 接口，严禁直接在业务层调用特定 SDK（如 Supabase 或 D1）。
+*   **Interface 定义**: 抽象统一的 CRUD、Auth 与 Query 契约。
+    *   **实现**: `SupabaseAdapter` (Cloud), `D1Adapter` (Edge), `SqliteAdapter` (Mobile/Local)。
+
+## 2. 存储契约化原则 (Storage Contract)
+*   **严禁直连**: 业务逻辑严禁 `import` 任何特定数据库 SDK（如 `@supabase/supabase-js`）。
+*   **依赖注入**: 存储实现通过配置注入动作层。切换数据库只需更换实现类，逻辑层代码 0 改动。
+
+## 3. 渲染策略：流量驱动型 SSG (Analytics-Driven)
+*   **流量回溯**: 构建时查询 Cloudflare Analytics，对前 10% 高频路径进行 SSG。
+*   **动态 SSR**: 剩余长尾页面通过 Edge Worker 执行 API Action 渲染。
+*   **跨端复用**: 相同的渲染逻辑可在 RN 端用于生成离线页面视图。
+
+## 4. 零硬编码准则 (Zero Hardcoding)
+*   **配置中心化**: 所有的 API 端点、密钥标识、功能开关由 `ConfigService` 统一管理。
+*   **UI 抽象化**: 使用 Design Tokens (JSON) 驱动样式。Web 端映射至 Tailwind，RN 端映射至原生样式系统。
+*   **逻辑纯净化**: 动作层禁止引用 `window`, `document`, `navigator` 等浏览器专有全局对象。
+
+---
+
+## 5. 多端复用检查清单
+- [ ] 核心 Action 是否能同时在 Node.js 和移动端 JS 引擎中运行？
+- [ ] 存储操作是否完全被 `IStorageAdapter` 接口屏蔽？
+- [ ] 所有的样式定义是否基于 Token，而非硬编码的 CSS/像素？
+```
+
+---
+
+### 文档 2：类型安全与跨端契约指南 (TYPE_SAFETY.md)
+
+```markdown
+# 类型安全与跨端契约指南 (Type Safety & Unified Contract)
+
+## 1. 契约驱动：Zod & tRPC
+系统以 **Schema** 为核心，而非代码实现。
+
+*   **单一真相源**: 在 `packages/shared` 中定义所有业务实体的 Zod Schema。
+*   **端到端同步**: 
+    *   Web 端通过 tRPC 实现“修改后即编译报错”的强类型同步。
+    *   RN 端通过导入相同的 Action 类型实现本地逻辑的类型约束。
+
+## 2. 结果对象模式 (Unified Result Pattern)
+为了统一处理网络异常（Web）和原生存储异常（RN），所有 Procedure 必须返回：
+```typescript
+type Result<T, E = AppError> = 
+  | { ok: true; data: T; source: 'server' | 'cache' | 'local' } 
+  | { ok: false; error: E };
+```
+*   `source` 字段允许 UI 根据数据来源（如本地缓存或实时服务器）展示不同的 UI 提示（如“离线模式”标签）。
+
+## 3. 存储层类型契约 (Adapter Types)
+```typescript
+interface IStorageAdapter {
+  /** 泛型约束确保返回的数据库记录自动转换为领域模型 */
+  query<T>(collection: string, params: QueryParams): Promise<Result<T[]>>;
+  
+  /** 统一身份认证接口，适配 Web Cookies 和 RN SecureStore */
+  auth: {
+    getSession(): Promise<Result<Session | null>>;
+  };
+}
+```
+
+## 4. 跨平台样式安全 (Design Token Typing)
+```typescript
+/** 设计令牌类型化，确保样式在 Web 与 RN 之间的一致性 */
+type DesignToken = {
+  colors: Record<ColorName, string>;
+  spacing: Record<SizeName, number>;
+};
+
+// 禁止使用 string，必须使用 Token 定义的 key
+```
+
+## 5. 类型安全检查清单
+- [ ] 所有的 API 调用是否具备端到端类型回溯？
+- [ ] 所有的 Result 对象是否强制进行了 `ok` 状态检查？
+- [ ] 实体定义 (Entities) 是否使用了平台无关的时间戳 (number) 和标识符 (string)？
+- [ ] 是否在 Action 层之外出现了厂商特定的类型定义？（应被 Adapter 屏蔽）
+
+---
+
+## 6. 质量红线
+*   **禁止 any**: 外部数据入口必须进行校验或断言。
+*   **禁止平台污染**: 在 `packages/core` 中出现 Web API 类型视为构建失败。
+```
+
+---
+
+### 💡 为什么这套方案能兼顾“一套底层，多端应用”？
+
+1.  **代码复用率最高化**：
+    你的业务逻辑（Action 层）和校验逻辑（Zod）在 `packages/core` 中。Web、RN、Edge 只需分别实现 UI 和特定的适配器，复用率可达 80% 以上。
+
+2.  **极速迁移能力**：
+    当你从 PWA 转向 React Native 时，你不需要重新写 API 调用逻辑。你只需要把 tRPC 的客户端调用换成 Local 调用，或者让 RN 也通过 tRPC 访问 Worker。
+
+3.  **存储灵活性**：
+    初期你可能用 Supabase 做 Web，后期 RN 版本为了离线体验可能需要 SQLite。有了 **Storage Adapter 契约**，你只需增加一个适配器实现，而不用动任何业务代码。
+
+4.  **Edge 渲染优势**：
+    Astro 在 Cloudflare 边缘节点运行动作层，速度极快；而 RN 在本地运行动作层，响应零延迟。
+
+**接下来，我们是否可以开始定义具体的 `IStorageAdapter` 接口和第一个 `Action` 的 Schema？**
+
+
+# 技术架构与零硬编码规范 (Architecture & Decoupling Standards)
+
+## 1. 核心分层架构：动作契约化
+系统不再区分传统的 Hooks 和 Services，而是统一抽象为 **API 层 (Action Layer)**。UI 仅通过契约调用动作，不关心是本地执行还是远程执行。
+
+### 1.1 分层职责
+*   **表现层 (React/RN UI)**: 纯视图。通过统一的 API 客户端发起动作，接收 `Result` 对象。
+*   **API 层 (Actions/Procedures)**: 【契约中心】定义所有可执行的操作（如 `getUser`, `updateHealthLog`）。
+    *   **tRPC 实现**: 用于 Web/PWA，提供端到端类型安全的远程调用，直接连接 Cloudflare Workers。
+    *   **HTTP/REST 实现**: 用于兼容性场景或第三方集成。
+    *   **Local 实现**: 用于 React Native 或 PWA 离线模式，直接在本地运行业务逻辑。
+*   **持久层 (Storage Adapters)**: 【存储契约】API 层不直接操作数据库，而是调用 `StorageAdapter` 实现增删改查。
+
+## 2. 存储适配器模式 (Storage Adapter Pattern)
+为了支持从 Supabase 到 Cloudflare D1 的无缝迁移，存储层必须契约化：
+*   **实现类**: `SupabaseAdapter`, `D1Adapter`, `SqliteAdapter` (RN/Local)。
+*   **原则**: 业务逻辑仅通过 `IStorageAdapter` 接口操作数据，屏蔽具体厂商 SDK。
+
+## 3. 渲染策略：流量驱动型 SSG (Analytics-Driven)
+*   **90/10 法则**: Astro 构建时获取 Cloudflare 流量统计，仅预渲染前 10% 的高频页面。
+*   **动态回退**: 剩余 90% 页面由 Edge Worker 通过 API 层进行 SSR 渲染，并缓存至 KV。
+
+## 4. 零硬编码准则 (Zero Hardcoding Policy)
+*   **配置化**: 所有的 API Endpoint、存储提供商标识、功能开关必须存储在 `AppConfig` 中。
+*   **设计令牌 (Design Tokens)**: 样式必须使用 Token（如 `theme.spacing.md`），以便 Web (Tailwind) 与 RN (StyleSheet) 共享一套视觉逻辑。
+*   **文案国际化**: 严禁在 API 返回值或 UI 中硬编码中文/英文，必须通过 i18n ID 引用。
+
+---
+
+## 5. RN 迁移就绪清单
+- [ ] API 层是否实现了双端适配（tRPC 远程 / Local 运行）？
+- [ ] 所有的样式是否基于 Token 抽象，而非硬编码 CSS？
+- [ ] 是否存在逻辑层直接引用 `window` 或 `localStorage` 的情况？# 单体应用向 Monorepo 架构迁移指南 (Monorepo Migration Guide)
+
+当项目从典型的单体（Monolithic）结构向更严谨的 Monorepo 结构演进时，本指南提供了标准化的迁移路径与最佳实践。
+
+---
+
+## 1. 迁移原则 (Principles)
+
+*   **应用与库的分离**：`apps/` 存放可独立部署的程序；`packages/` 存放被依赖的逻辑库。
+
+*   **功能归位**：服务端入口应属于具体的应用环境，核心业务逻辑应抽离为独立包。
+
+*   **最小化路径风险**：通过代理入口保持兼容，逐步完成深度重构。
+
+---
+
+## 2. 迁移步骤 (Step-by-Step)
+
+### 第一步：目录结构重构
+
+1.  **创建包目录**：在 `/packages` 下创建标准化的子目录，如下：
+
+    *   `ui/`：存放 React/Vue 通用组件。
+
+    *   `core/`：核心模块 (db, payment, utils)。
+
+    *   `api/`：站点感知的 Hono 业务 API。
+
+    *   `auth/`：独立认证 Worker。
+
+    *   `video-service/`：异步任务 Worker。
+
+    *   `types/`：共享 TypeScript 类型。
+
+    *   `config/`：共享构建配置 (ESLint, Prettier)。
+
+2.  **规划边界**：确定哪些是独立的应用（部署单位），哪些是共享的逻辑依赖。
+
+### 第二步：逻辑迁移 (Service Extraction)
+
+将业务逻辑按职能分包：
+
+1.  **提取逻辑**：将原根目录下的逻辑（如 `/server.ts`）抽离核心渲染逻辑。
+
+2.  **移至包中**：将抽离的代码放入 `packages/api/src/` 中，通过 `export` 暴露初始化函数。
+
+3.  **保持纯净**：包内的逻辑应尽量减少对外部硬依赖的引用，通过参数注入运行配置。
+
+### 第三步：调整应用入口 (Application Refactoring)
+
+1.  **代理入口**：在对应的应用下（如 `/apps/web/server.ts`）保留一个轻量级代理入口，仅负责调用 `packages/api` 导出的方法。
+
+2.  **更新路径**：修复所有在被迁移文件中的相对导入路径（使用 `../../` 等方式精确回溯）。
+
+3.  **配置更新**：
+
+    *   更新 `package.json` 中的 `scripts` 执行路径（例如：从 `tsx server.ts` 更新为 `tsx apps/web/server.ts`）。
+
+    *   确保构建工具和 IDE 路径映射正确。
+
+### 第四步：基础设施适配
+
+1.  **重启服务**：执行 `restart_dev_server` 清理旧缓存。
+
+2.  **验证环境**：检查 `Vite` 中间件路径配置（`dist/client` 等静态路径）是否依然指向正确。
+
+---
+
+## 3. 注意事项 (Critical Directives)
+
+*   **绝对路径与相对路径**：迁移后需要仔细排查 `import` 路径错误。
+
+*   **依赖循环**：避免 `apps/web` 引用 `packages/api` 的同时，`packages/api` 又试图引用 `apps/web` 下的非共享组件。
+
+*   **CI/CD 一致性**：如果在 CI 中存在自定义构建脚本，必须同步更新其入口路径。
+
+---
+
+## 4. 迁移检查清单 (Migration Checklist)
+
+- [ ] 逻辑包是否已实现与运行环境（Browser/Node）的部分解耦？
+
+- [ ] 应用入口代理脚本是否足够轻量（建议<10行）？
+
+- [ ] `package.json` 中的 `scripts` 是否已更新为对应的应用子目录路径？
+
+- [ ] 所有测试用例是否已指向新的文件位置？The user wants to migrate to a Monorepo-style architecture, but the guidance explicitly notes that in Lovable projects, we must keep everything inside src/ to avoid breaking the Vite + Supabase type-gen toolchain. So this is a "Modular Monolith" — logical monorepo structure mirrored inside src/.
+
+Let me explore current state quickly to ground the plan.
+
+Key facts I already know from context:
+
+src/storage/ adapter layer exists (Supabase/sqljs/d1)
+
+src/services/ exists as logic layer
+
+src/components/, src/screens/, src/pages/, src/hooks/ exist
+
+src/integrations/supabase/ is auto-generated, must NOT move
+
+4 files still import supabase directly (audit found)
+
+Hardcoded URLs in data/, colors in components
+
+The plan: build src/packages/ and src/apps/ mirror inside src/, move logic into "packages", keep src/pages + entry as the "app". No tRPC for now (overkill — keep Action layer as typed function calls inside packages/api). Phase work to avoid breaking Vite/Supabase.
+
+Keep it concise per instructions.
+
+<lov-plan>
+
+Modular Monolith Migration (Inside src/)
+
+Mirror a monorepo structure inside src/ to preserve Lovable's Vite + Supabase auto-generation toolchain. Logically monorepo, physically transparent to the compiler.
+
+Target Structure
+code
+Text
+download
+content_copy
+expand_less
+src/
+  apps/
+    web/                       ← The React SPA (current pages + entry)
+      pages/                     (moved from src/pages)
+      screens/                   (moved from src/screens)
+      App.tsx, main.tsx          (moved from src/)
+  packages/
+    ui/                        ← Shared UI primitives
+      components/                (moved from src/components, minus app-specific)
+    core/                      ← Platform-agnostic utilities
+      utils/                     (moved from src/lib + src/utils)
+      config/                    NEW: AppConfig (URLs, CDN, feature flags)
+    api/                       ← Action Layer (contract center)
+      actions/                   NEW: typed action functions (getUser, createPost…)
+      services/                  (moved from src/services — internal to api)
+    storage/                   ← Storage Adapter (moved from src/storage)
+    types/                     ← Shared TS types (moved from src/types + character.ts)
+    hooks/                     ← React hooks (moved from src/hooks)
+    i18n/                      ← Language provider (moved from components/ui/language-provider)
+  integrations/                ← UNCHANGED (Supabase auto-gen)
+  index.css                    ← UNCHANGED (Vite/Tailwind entry)
+
+Path aliases (tsconfig.json + vite.config.ts):
+
+@/* → src/* (kept for back-compat)
+
+@app/* → src/apps/web/*
+
+@ui/* → src/packages/ui/*
+
+@core/* → src/packages/core/*
+
+@api/* → src/packages/api/*
+
+@storage/* → src/packages/storage/*
+
+@types/* → src/packages/types/*
+
+@hooks/* → src/packages/hooks/*
+
+@i18n/* → src/packages/i18n/*
+
+Action Layer (API Contract Center)
+
+Replace direct service calls from hooks with typed actions. Actions are the public contract; services become internal implementation.
+
+code
+Ts
+download
+content_copy
+expand_less
+// src/packages/api/actions/blog.ts
+import { fetchPosts as _fetchPosts } from '../services/blogService';
+import type { Result, BlogPost } from '@types';
+
+export const blogActions = {
+  list: async (filters?): Promise<Result<BlogPost[]>> => {
+    try { return { ok: true, data: await _fetchPosts(filters), source: 'network' }; }
+    catch (e) { return { ok: false, error: e as Error }; }
+  },
+  // get, create, update, delete…
+};
+
+Future: same blogActions shape can be backed by tRPC, REST, or local SQLite — UI doesn't change.
+
+Phased Execution
+
+Phase 1 — Scaffold + aliases (no moves yet)
+
+Create empty src/apps/web/, src/packages/{ui,core,api,storage,types,hooks,i18n}/ with READMEs
+
+Add path aliases to tsconfig.json, tsconfig.app.json, vite.config.ts
+
+Verify build still passes
+
+Phase 2 — Move leaf packages (low-risk)
+
+src/storage/ → src/packages/storage/
+
+src/types/ + src/data/characters.ts types → src/packages/types/
+
+src/lib/ + src/utils/ → src/packages/core/utils/
+
+Create src/packages/core/config/ with AppConfig (SITE_DOMAIN, CDN_BASE, external links)
+
+Update imports project-wide via search/replace
+
+Phase 3 — Move services + introduce Actions
+
+src/services/ → src/packages/api/services/ (internal)
+
+Create src/packages/api/actions/ wrapping each service with Result<T> pattern
+
+Hooks call actions, not services directly
+
+Phase 4 — Move hooks, i18n, UI
+
+src/hooks/ → src/packages/hooks/
+
+src/components/ui/language-provider.tsx → src/packages/i18n/
+
+src/components/ui/* → src/packages/ui/components/ui/
+
+Domain components stay where used or move to src/apps/web/components/
+
+Phase 5 — Move app shell
+
+src/pages/ → src/apps/web/pages/
+
+src/screens/ → src/apps/web/screens/
+
+src/App.tsx, src/main.tsx, src/App.css → src/apps/web/
+
+Update index.html script src to /src/apps/web/main.tsx
+
+Phase 6 — Cleanup
+
+Remove now-empty old directories
+
+Remove temporary @/ shims if all imports migrated
+
+Update docs/ARCHITECTURE.md + READMEs
+
+What Does NOT Move
+
+src/integrations/supabase/ (auto-generated)
+
+src/index.css (Vite/Tailwind entry)
+
+src/vite-env.d.ts
+
+supabase/, public/, index.html, tailwind.config.ts, vite.config.ts (root configs)
+
+Risks & Mitigations
+Risk	Mitigation
+Vite HMR breaks	Keep src/ as Vite root; only add aliases, don't move outside src/
+Supabase type-gen breaks	src/integrations/supabase/ untouched
+Import-path churn	Do moves package-by-package, run tsc --noEmit after each phase
+Lovable auto-fix confusion	Keep @/* alias as transitional fallback
+Recommended Scope for THIS Implementation Pass
