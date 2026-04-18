@@ -1,3 +1,5 @@
+
+```
 The user wants to migrate to a Monorepo-style architecture, but the guidance explicitly notes that in Lovable projects, we must keep everything inside src/ to avoid breaking the Vite + Supabase type-gen toolchain. So this is a "Modular Monolith" — logical monorepo structure mirrored inside src/.
 
 Let me explore current state quickly to ground the plan.
@@ -173,4 +175,4 @@ Import-path churn	Do moves package-by-package, run tsc --noEmit after each phase
 Lovable auto-fix confusion	Keep @/* alias as transitional fallback
 Recommended Scope for THIS Implementation Pass
 
-Phases 1 + 2 + 3 (scaffold, leaf packages, services → actions). Phases 4–6 in follow-up tasks to keep diffs reviewable.
+```
