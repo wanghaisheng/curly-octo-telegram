@@ -1,0 +1,90 @@
+
+```
+
+AI Design Field Guide
+46 ways to work with AI design tools. Works with Claude Design, Figma Make, Stitch, Canva, or whatever you're using.
+
+The canvas was never the design. Charles and Ray Eames knew this in 1949. Design is a plan for arranging elements to accomplish a particular purpose — not a rendering, not a deliverable, not a beautifully crafted file.
+
+AI design tools have made this visible in a way nothing else could. When you describe your intent and an artifact materialises, it becomes impossible to pretend the canvas was doing the thinking. The conversation was. Everything after is rendering.
+
+This field guide is for designers who want to work with AI design tools the way a designer would — not just generate things, but think things. It is organised into five clusters that follow the arc of real design work. Use it before you open any tool. Use it while you're in it. Use it when something is going wrong and you can't name why.
+
+Not prompts. Not templates. Ways to work.
+
+Five questions in the Eames tradition
+Run these before you open any design tool. Five questions. Ten minutes.
+
+The Eames never wrote these down as a checklist — but they are drawn directly from how the Eames worked, and from their definition of design as "a plan for arranging elements to accomplish a particular purpose." The questions are ours. The philosophy is theirs.
+
+#	Question	Why it matters
+01	What is the purpose?	Not "make a dashboard." What specific outcome does this achieve? For whom? In what moment of their day?
+02	Who, exactly?	Name a real person. Not "users." The person implies the aesthetic. The aesthetic does not imply the person.
+03	What are you working within?	Brand, time, technology, budget. Constraints are not obstacles. They are the shape of the solution.
+04	What is the one thing?	Three seconds. One thing to understand, feel, or do. Not three. One.
+05	How will you know it worked?	Not "it looks good." What changes in behaviour, decision, or understanding?
+The thinking that happens here is the design.
+
+The Five Clusters
+1. Before You Start
+The design happens here. Before you open anything.
+
+Answer "what is this for?" before you describe what it looks like.
+Name a real person before you name a colour.
+Write down your constraints before your preferences.
+Separate what you know from what you're assuming.
+Define success in human behaviour, not aesthetics.
+Ask: who is NOT the audience?
+Read your brand guide before your first prompt, not after.
+Run the five questions.
+2. Prompting for Intent
+You have the intent. Here's how to get it out of your head and into language precise enough to produce something real.
+
+Lead with purpose, not description.
+Give context about the moment of use.
+Specify what the user needs to understand, feel, or do — not what they need to see.
+Include what you're NOT trying to do.
+State your constraints as facts, not apologies.
+Give the AI a role.
+Reference qualities, not styles.
+Specify the emotional register.
+Tell the AI what you know about your user's expertise level.
+Give the AI your failure mode.
+Include the business context.
+Prompt for multiple directions before you commit to one.
+Ask for the reasoning behind the first version.
+3. Iterating Through Conversation
+How to refine without losing ground. How to know when you're done.
+
+Separate "I don't understand it" from "I don't like it."
+When something works, name it explicitly before you ask for changes.
+Be specific about what is wrong.
+Don't start over when you can redirect.
+Use the tool's custom controls as vocabulary.
+Ask the AI to explain its decisions before you critique them.
+When you're stuck, change the constraint rather than the aesthetic.
+Restate the original purpose periodically.
+Treat unexpected outputs as data.
+Know when to stop iterating.
+4. Critique and Evaluation
+You've seen the output. Now look at it like a designer.
+
+Evaluate against purpose first, aesthetics second.
+Ask: would the real user understand this in three seconds?
+Test the hierarchy before the colour.
+Ask the AI to critique its own output against your stated intent.
+Bring a second voice in before you export.
+Check that brand application is correct, not just present.
+Evaluate for what is missing, not just what is there.
+Ask: does this solve the problem, or does it look like it solves the problem?
+5. Handoff and Output
+The design intent needs to travel. Here's how to make sure it does.
+
+Document the design intent before you export.
+Export for collaboration, not just for editing.
+When handing off to a developer or build tool, include the design rationale, not just the spec.
+Keep the conversation thread.
+Note which decisions were intentional and which were the AI's defaults.
+Brief the human who continues this work on the intent, not the output.
+Archive the prompts that produced good work.
+```
